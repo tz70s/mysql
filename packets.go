@@ -301,6 +301,10 @@ func (mc *mysqlConn) writeHandshakeResponsePacket(authResp []byte, plugin string
 		clientFlags |= clientMultiStatements
 	}
 
+	if mc.cfg.ResultSetMetadata != "" {
+		clientFlags |= clientOptionalResultSetMetadata
+	}
+
 	// encode length of the auth plugin data
 	var authRespLEIBuf [9]byte
 	authRespLen := len(authResp)
@@ -552,6 +556,17 @@ func (mc *mysqlConn) readResultSetHeaderPacket() (int, error) {
 		// column count
 		num, _, n := readLengthEncodedInteger(data)
 		if n-len(data) == 0 {
+			return int(num), nil
+		}
+
+		// Sniff one extra byte for resultset metadata if we set capability
+		// CLIENT_OPTIONAL_RESULTSET_METADTA
+		// https://dev.mysql.com/worklog/task/?id=8134
+		if len(data) == 2 {
+			// ResultSet metadata flag check
+			if mc.resultSetMetadata != data[1] {
+				return 0, ErrOptionalResultSet
+			}
 			return int(num), nil
 		}
 
