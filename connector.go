@@ -143,7 +143,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 			mc.resultSetMetadata = resultSetMetadataFull
 		default:
 			mc.Close()
-			return nil, ErrOptionalResultSet
+			return nil, ErrOptionalResultSetPkt
 		}
 	}
 

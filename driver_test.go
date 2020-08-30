@@ -202,6 +202,7 @@ func (dbt *DBTest) mustQuery(query string, args ...interface{}) (rows *sql.Rows)
 func maybeSkip(t *testing.T, err error, skipErrno uint16) {
 	mySQLErr, ok := err.(*MySQLError)
 	if !ok {
+		errLog.Print("non match")
 		return
 	}
 
@@ -1348,9 +1349,11 @@ func TestFoundRows(t *testing.T) {
 func TestOptionalResultSetMetadata(t *testing.T) {
 	runTests(t, dsn+"&resultSetMetadata=none", func(dbt *DBTest) {
 		_, err := dbt.db.Exec("CREATE TABLE test (id INT NOT NULL ,data INT NOT NULL)")
-		// Error 1193: Unknown system variable 'resultset_metadata' => skip test,
-		// MySQL server version is too old
-		maybeSkip(t, err, 1193)
+		if err == ErrNoOptionalResultSet {
+			t.Skip("server does not support resultset metadata")
+		} else if err != nil {
+			dbt.Fatal(err)
+		}
 		dbt.mustExec("INSERT INTO test (id, data) VALUES (0, 0),(0, 0),(1, 0),(1, 0),(1, 1)")
 
 		row := dbt.db.QueryRow("SELECT id, data FROM test WHERE id = 1")
@@ -1366,9 +1369,11 @@ func TestOptionalResultSetMetadata(t *testing.T) {
 	})
 	runTests(t, dsn+"&resultSetMetadata=full", func(dbt *DBTest) {
 		_, err := dbt.db.Exec("CREATE TABLE test (id INT NOT NULL ,data INT NOT NULL)")
-		// Error 1193: Unknown system variable 'resultset_metadata' => skip test,
-		// MySQL server version is too old
-		maybeSkip(t, err, 1193)
+		if err == ErrNoOptionalResultSet {
+			t.Skip("server does not support resultset metadata")
+		} else if err != nil {
+			dbt.Fatal(err)
+		}
 		dbt.mustExec("INSERT INTO test (id, data) VALUES (0, 0),(0, 0),(1, 0),(1, 0),(1, 1)")
 
 		row := dbt.db.QueryRow("SELECT id, data FROM test WHERE id = 1")

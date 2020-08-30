@@ -417,7 +417,7 @@ func (mc *mysqlConn) readIgnoreColumns(rows *textRows, resLen int) (*textRows, e
 		rows.rs.columnNames = make([]string, resLen)
 		return rows, nil
 	}
-	return nil, ErrOptionalResultSet
+	return nil, ErrOptionalResultSetPkt
 }
 
 // Gets the value of the given MySQL System Variable
