@@ -614,7 +614,7 @@ func readStatus(b []byte) statusFlag {
 }
 
 // Ok Packet
-// http://dev.mysql.com/doc/internals/en/generic-response-packets.html#packet-OK_Packet
+// https://dev.mysql.com/doc/internals/en/packet-OK_Packet.html
 func (mc *mysqlConn) handleOkPacket(data []byte) error {
 	// 0x00 or 0xFE [1 byte]
 	n := 1
@@ -634,14 +634,19 @@ func (mc *mysqlConn) handleOkPacket(data []byte) error {
 	}
 
 	// warning count [2 bytes]
+	n += 2
 
 	return nil
 }
 
 // isEOFPacket will return true if the data is either a EOF-Packet or OK-Packet
 // acting as an EOF.
-func isEOFPacket(data []byte) bool {
-	return data[0] == iEOF && len(data) < 9
+func (mc *mysqlConn) isEOFPacket(data []byte) bool {
+	// Legacy EOF packet
+	if data[0] == iEOF && (len(data) == 5 || len(data) == 1) && mc.flags&clientDeprecateEOF == 0 {
+		return true
+	}
+	return data[0] == iEOF && len(data) < 9 && mc.flags&clientDeprecateEOF != 0
 }
 
 // Read Packets as Field Packets until EOF-Packet or an Error appears
@@ -655,7 +660,7 @@ func (mc *mysqlConn) readColumns(count int) ([]mysqlField, error) {
 			return nil, err
 		}
 
-		if mc.flags&clientDeprecateEOF == 0 && isEOFPacket(data) {
+		if mc.isEOFPacket(data) {
 			if i == count {
 				return columns, nil
 			}
@@ -759,7 +764,7 @@ func (rows *textRows) readRow(dest []driver.Value) error {
 	}
 
 	// EOF Packet
-	if isEOFPacket(data) {
+	if mc.isEOFPacket(data) {
 		if mc.flags&clientDeprecateEOF == 0 {
 			// server_status [2 bytes]
 			rows.mc.status = readStatus(data[3:])
@@ -830,7 +835,7 @@ func (mc *mysqlConn) readUntilEOF() error {
 		switch {
 		case data[0] == iERR:
 			return mc.handleErrorPacket(data)
-		case isEOFPacket(data):
+		case mc.isEOFPacket(data):
 			if mc.flags&clientDeprecateEOF == 0 {
 				mc.status = readStatus(data[3:])
 			} else {
@@ -857,7 +862,7 @@ func (mc *mysqlConn) readPackets(num int) error {
 		switch {
 		case data[0] == iERR:
 			return mc.handleErrorPacket(data)
-		case mc.flags&clientDeprecateEOF == 0 && isEOFPacket(data):
+		case mc.isEOFPacket(data):
 			mc.status = readStatus(data[3:])
 			return nil
 		}
@@ -1223,7 +1228,7 @@ func (rows *binaryRows) readRow(dest []driver.Value) error {
 
 	// packet indicator [1 byte]
 	if data[0] != iOK {
-		if isEOFPacket(data) {
+		if rows.mc.isEOFPacket(data) {
 			if rows.mc.flags&clientDeprecateEOF == 0 {
 				rows.mc.status = readStatus(data[3:])
 			} else {
